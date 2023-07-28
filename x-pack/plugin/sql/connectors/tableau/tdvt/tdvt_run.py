@@ -19,7 +19,7 @@ import getpass
 
 
 TDVT_SDK_NAME = "connector-plugin-sdk"
-TDVT_SDK_REPO = "https://github.com/tableau/" + TDVT_SDK_NAME
+TDVT_SDK_REPO = f"https://github.com/tableau/{TDVT_SDK_NAME}"
 TDVT_SDK_BRANCH = "tdvt-2.1.9"
 TDVT_ES_SCHEME = "simple_lower"
 
@@ -71,7 +71,7 @@ def interact(proc, interactive):
 
 def exe(args, interactive = None, raise_on_retcode = True):
     with subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True) as proc:
+                universal_newlines=True) as proc:
         if interactive is not None:
             interact(proc, interactive)
 
@@ -84,7 +84,7 @@ def exe(args, interactive = None, raise_on_retcode = True):
         if proc.returncode != 0 and raise_on_retcode:
             print("command stdout: \n" + stdout)
             print("command stderr: \n" + stderr)
-            raise Exception("Command exited with code %s: '%s' !" % (proc.returncode, args))
+            raise Exception(f"Command exited with code {proc.returncode}: '{args}' !")
         return (proc.returncode, stdout, stderr)
 
 def checkout_tdvt_sdk():
@@ -122,12 +122,15 @@ def install_tds_files(tds_src_dir, elastic_url):
             with open(os.path.join(tds_src_dir, filename)) as src:
                 content = src.read()
                 if filename.endswith(".tds"):
-                    content = content.replace("caption='127.0.0.1'", "caption='" + es_url.host + "'")
-                    content = content.replace("dbname='elasticsearch'", "dbname='" + dbname(es_url.host) + "'")
-                    content = content.replace("server='127.0.0.1'", "server='" + es_url.host + "'")
-                    content = content.replace("port='9200'", "port='" + str(es_url.port) + "'")
+                    content = content.replace("caption='127.0.0.1'", f"caption='{es_url.host}'")
+                    content = content.replace(
+                        "dbname='elasticsearch'",
+                        f"dbname='{dbname(es_url.host)}'",
+                    )
+                    content = content.replace("server='127.0.0.1'", f"server='{es_url.host}'")
+                    content = content.replace("port='9200'", f"port='{str(es_url.port)}'")
                     if es_user != "elastic":
-                        content = content.replace("username='elastic'", "username='" + es_user + "'")
+                        content = content.replace("username='elastic'", f"username='{es_user}'")
                     if es_url.scheme.lower() == "https":
                         content = content.replace("sslmode=''", "sslmode='require'")
                 elif filename.endswith(".password"):
@@ -144,8 +147,6 @@ def latest_tabquery():
 
     latest = ""
     for (dirpath, dirnames, filenames) in os.walk(TABLEAU_INSTALL_FOLDER, topdown=True):
-        if dirpath != TABLEAU_INSTALL_FOLDER:
-            pass #break
         for dirname in dirnames:
             if re.match("^Tableau 202[0-9]\.[0-9]$", dirname):
                 if dirname > latest:
@@ -158,18 +159,17 @@ def config_tdvt_override_ini():
     TDVT_INI_PATH = os.path.join("config", "tdvt", "tdvt_override.ini")
 
     tabquery_path = latest_tabquery()
-    tabquery_path_line = "TAB_CLI_EXE_X64 = " + tabquery_path
+    tabquery_path_line = f"TAB_CLI_EXE_X64 = {tabquery_path}"
 
     updated_lines = []
     with open(TDVT_INI_PATH) as ini:
-        for line in ini.readlines():
+        for line in ini:
             l = line if not line.startswith("TAB_CLI_EXE_X64") else tabquery_path_line
             l += '\n'
             updated_lines.append(l)
     if len(updated_lines) <= 0:
-        print("WARNING: empty ini file under: " + TDVT_INI_PATH)
-        updated_lines.append("[DEFAULT]\n")
-        updated_lines.append(tabquery_path_line + '\n')
+        print(f"WARNING: empty ini file under: {TDVT_INI_PATH}")
+        updated_lines.extend(("[DEFAULT]\n", tabquery_path_line + '\n'))
     with open(TDVT_INI_PATH, "w") as ini:
         ini.writelines(updated_lines)
 
@@ -183,12 +183,11 @@ def add_data_source():
 def config_elastic_ini():
     ELASTIC_INI = os.path.join("config", "elastic.ini")
 
-    cmdline_override = "CommandLineOverride = -DConnectPluginsPath=%s -DDisableVerifyConnectorPluginSignature=%s" % \
-            (TACO_SRC_DIR, TACO_SIGNED)
+    cmdline_override = f"CommandLineOverride = -DConnectPluginsPath={TACO_SRC_DIR} -DDisableVerifyConnectorPluginSignature={TACO_SIGNED}"
 
     updated_lines = []
     with open(ELASTIC_INI) as ini:
-        for line in ini.readlines():
+        for line in ini:
             updated_lines.append(line)
             if line.startswith("LogicalQueryFormat"):
                 updated_lines.append(cmdline_override)
